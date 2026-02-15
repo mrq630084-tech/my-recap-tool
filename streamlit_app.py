@@ -5,13 +5,12 @@ import cv2
 import tempfile
 import os
 
-st.set_page_config(page_title="Video Recap Tool", page_icon="🎬")
 st.title("🎬 Video Recap Tool")
 
-# AI Model ကို ပိုပြီး Stable ဖြစ်အောင် ခေါ်ယူခြင်း
+# AI Model ကို လုံးဝ ရိုးရိုးရှင်းရှင်းပဲ ခေါ်ပါမယ်
 @st.cache_resource
 def load_model():
-    # ဤနေရာတွင် task နာမည်ကို version အားလုံးနှင့် ကိုက်အောင် ထားထားသည်
+    # task နာမည်ကို 'image-to-text' ဟုပဲ ထားပါမည် (Error မတက်စေရန် version အဟောင်းအတိုင်း သုံးပါမည်)
     return pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
 
 caption_model = load_model()
@@ -19,38 +18,34 @@ caption_model = load_model()
 uploaded_file = st.file_uploader("ဗီဒီယို တင်ပါ", type=["mp4", "mov", "avi"])
 
 if uploaded_file:
-    # ဗီဒီယိုကို ယာယီသိမ်းဆည်းခြင်း
+    # ဗီဒီယိုကို ခဏ သိမ်းထားရန်
     tfile = tempfile.NamedTemporaryFile(delete=False)
     tfile.write(uploaded_file.read())
     
     st.video(uploaded_file)
     
     if st.button("Generate Recap"):
-        with st.spinner('AI က ဗီဒီယိုကို လေ့လာနေပါသည်...'):
+        with st.spinner('AI က ဗီဒီယိုကို ကြည့်နေပါသည်...'):
             try:
-                # ဗီဒီယိုထဲမှ အလယ် frame တစ်ခုကို ထုတ်ယူခြင်း (Error ကင်းစေရန်)
+                # ဗီဒီယိုထဲက ပုံကို ဆွဲထုတ်ခြင်း (OpenCV သုံးထားသည်)
                 vidcap = cv2.VideoCapture(tfile.name)
-                # ဗီဒီယိုရဲ့ အလယ်ပုံကို ယူရန်
-                fps = vidcap.get(cv2.CAP_PROP_FPS)
-                vidcap.set(cv2.CAP_PROP_POS_FRAMES, int(fps * 1)) # ၁ စက္ကန့်မြောက်ပုံကို ယူမည်
-                
                 success, image = vidcap.read()
+                
                 if success:
-                    # OpenCV image ကို PIL image သို့ ပြောင်းခြင်း
+                    # ပုံကို AI နားလည်အောင် ပြောင်းခြင်း
                     img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                     pil_img = Image.fromarray(img_rgb)
                     
-                    # AI Recap ထုတ်ပေးခြင်း
+                    # AI ကို Recap ထုတ်ခိုင်းခြင်း
                     result = caption_model(pil_img)
                     recap_text = result[0]['generated_text']
                     
-                    st.subheader("AI Recap (English):")
+                    st.subheader("AI Recap Result:")
                     st.success(recap_text)
-                    st.info("💡 ဒီစာသားကို Copy ကူးပြီး ကျွန်တော့်ဆီ ပို့ပေးပါ။ Recap Script မြန်မာလို ရေးပေးပါ့မယ်။")
                 else:
-                    st.error("ဗီဒီယိုပုံရိပ်ကို ဖတ်၍မရပါ။")
+                    st.error("ဗီဒီယိုထဲက ပုံရိပ်ကို ဖတ်လို့မရပါဘူး။")
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                st.error(f"Error တက်သွားပါသည်- {e}")
             finally:
                 vidcap.release()
                 os.unlink(tfile.name)
