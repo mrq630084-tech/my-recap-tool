@@ -1,4 +1,5 @@
 streamlit
 transformers
 torch
-torchvision
+Pillow
+opencv-python-headless
