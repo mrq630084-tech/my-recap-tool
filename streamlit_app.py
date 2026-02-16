@@ -1,94 +1,72 @@
 import streamlit as st
 from transformers import BlipProcessor, BlipForConditionalGeneration
-import torch
-from PIL import Image
 import cv2
 import tempfile
 import os
+import yt_dlp
 
-# ၁။ UI Layout နှင့် CSS
 st.set_page_config(page_title="Master YourMedia Workflow", layout="wide")
 
+# UI Design
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    div.stButton > button {
-        background-color: white; border-radius: 12px; height: 90px; width: 100%;
-        border: 1px solid #ddd; font-weight: bold; transition: 0.3s;
-    }
-    div.stButton > button:hover { border-color: #6c5ce7; color: #6c5ce7; }
-    .social-link {
-        display: inline-block; padding: 10px 20px; border-radius: 8px;
-        color: white; text-decoration: none; font-weight: bold; margin: 5px;
-    }
-    .yt { background-color: #ff0000; }
-    .tl { background-color: #0088cc; }
+    .stTextInput>div>div>input { border-radius: 10px; padding: 15px; }
+    .stButton>button { border-radius: 12px; height: 60px; background-color: #6c5ce7; color: white; }
     </style>
     """, unsafe_allow_html=True)
 
-if 'page' not in st.session_state: st.session_state.page = 'home'
-
-# ၂။ AI Model Loading
 @st.cache_resource
 def load_ai():
     processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
     model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
     return processor, model
 
-# --- HOME PAGE ---
+if 'page' not in st.session_state: st.session_state.page = 'home'
+
+# --- HOME DASHBOARD ---
 if st.session_state.page == 'home':
-    st.markdown("<h1 style='text-align:center;'>Master YourMedia Workflow.</h1>", unsafe_allow_html=True)
+    st.title("🚀 Master YourMedia Workflow.")
+    st.subheader("Link to AI Script Converter")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🎬\nVideo Recap"): st.session_state.page = 'recap'; st.rerun()
-    with col2:
-        if st.button("📝\nContent Creator"): st.session_state.page = 'creator'; st.rerun()
-
-    st.divider()
-    # Social Media Links Section
-    st.markdown("<h3 style='text-align:center;'>Connect with Us</h3>", unsafe_allow_html=True)
-    sc1, sc2 = st.columns(2)
-    with sc1:
-        st.markdown('<a href="https://youtube.com" class="social-link yt">📺 YouTube Tutorial</a>', unsafe_allow_html=True)
-    with sc2:
-        st.markdown('<a href="https://t.me" class="social-link tl">✈️ Telegram Channel</a>', unsafe_allow_html=True)
-
-# --- RECAP & SCRIPT PAGE ---
-elif st.session_state.page == 'recap':
-    if st.button("⬅️ Back"): st.session_state.page = 'home'; st.rerun()
-    st.title("🎬 Video to Script Converter")
+    # YouTube သို့မဟုတ် Video Link ထည့်ရန်နေရာ
+    video_url = st.text_input("YouTube သို့မဟုတ် Video Link ကို ဒီမှာထည့်ပါ...", placeholder="https://www.youtube.com/watch?v=...")
     
-    video = st.file_uploader("ဗီဒီယို တင်ပေးပါ", type=["mp4", "mov"])
-    if video:
-        st.video(video)
-        if st.button("Generate Final Script"):
-            with st.spinner('AI က ဇာတ်လမ်းကို ဖန်တီးနေပါသည်...'):
+    if st.button("Generate Script from Link"):
+        if video_url:
+            with st.spinner('AI က Link ထဲက ဗီဒီယိုကို လှမ်းဖတ်နေပါသည်...'):
                 try:
-                    processor, model = load_ai()
-                    tfile = tempfile.NamedTemporaryFile(delete=False)
-                    tfile.write(video.read())
-                    vidcap = cv2.VideoCapture(tfile.name)
+                    # ၁။ Link မှ ဗီဒီယိုကို ခေတ္တဒေါင်းယူခြင်း
+                    ydl_opts = {'format': 'best[ext=mp4]/best', 'outtmpl': 'temp_video.mp4'}
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([video_url])
                     
-                    # ၅ စက္ကန့်ခြား တစ်ခါ ပုံဖတ်ခြင်း
+                    # ၂။ AI ဖြင့် Analysis လုပ်ခြင်း
+                    processor, model = load_ai()
+                    vidcap = cv2.VideoCapture('temp_video.mp4')
                     success, frame = vidcap.read()
+                    
                     if success:
+                        from PIL import Image
                         img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         inputs = processor(Image.fromarray(img_rgb), return_tensors="pt")
                         out = model.generate(**inputs)
                         raw_text = processor.decode(out[0], skip_special_tokens=True)
                         
-                        # Professional Script အဖြစ် ပြောင်းလဲခြင်း
-                        st.subheader("📝 TikTok/Reels Script:")
+                        # ၃။ Professional Script ထုတ်ပေးခြင်း
+                        st.divider()
+                        st.subheader("📝 Generated Script:")
                         final_script = f"""
-                        🎬 **Title: Life Moments Recap**
+                        🎬 **Video Recap Script**
                         
-                        [Hook]: သင်မမြင်ဖူးသေးတဲ့ မြင်ကွင်းတစ်ခုကို ပြပေးမယ်...
-                        [Body]: ဒီဗီဒီယိုထဲမှာတော့ {raw_text} ကို တွေ့ရမှာဖြစ်ပြီး ဘဝရဲ့ အမှတ်တရတွေကို ဖော်ပြနေပါတယ်။
-                        [Ending]: နောက်ထပ် ဗီဒီယိုတွေ ကြည့်ချင်ရင်တော့ Follow လုပ်ထားဖို့ မမေ့နဲ့ဦးနော်!
+                        [Hook]: ဒီဗီဒီယိုထဲမှာ ဘာတွေဖြစ်နေလဲဆိုတာ ကြည့်လိုက်ရအောင်...
+                        [Content]: ဗီဒီယိုရဲ့ အဓိကအချက်ကတော့ {raw_text} ဖြစ်ပါတယ်။
+                        [Call to Action]: အသေးစိတ်သိချင်ရင်တော့ Link ကို နှိပ်ပြီး ကြည့်နိုင်ပါတယ်!
                         """
                         st.success(final_script)
+                        
                     vidcap.release()
-                    os.unlink(tfile.name)
+                    if os.path.exists('temp_video.mp4'): os.remove('temp_video.mp4')
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error: {e}. Link မှန်မမှန် ပြန်စစ်ပေးပါ။")
+        else:
+            st.warning("ကျေးဇူးပြု၍ Link တစ်ခု အရင်ထည့်ပေးပါဗျ။")
