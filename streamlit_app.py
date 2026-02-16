@@ -1,54 +1,31 @@
 import streamlit as st
 from transformers import pipeline
-from PIL import Image
-import cv2
-import tempfile
-import os
 
-st.set_page_config(page_title="Video Recap Tool", page_icon="🎬")
-st.title("🎬 Video Recap Tool")
+st.set_page_config(page_title="Video Recap Tool")
+st.title("🎬 AI Video Recap Generator")
 
-# AI Model ကို လုံးဝ အခြေခံကျကျ ခေါ်ယူခြင်း
+# ဗီဒီယိုမတင်ခင် model ကို ကြိုမခေါ်အောင် လုပ်ထားပါတယ်
 @st.cache_resource
 def load_model():
-    # task နာမည်ကို model တိုက်ရိုက်ခေါ်ခြင်းဖြင့် error ရှောင်ပါမည်
     return pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
 
-caption_model = load_model()
+uploaded_file = st.file_uploader("ဗီဒီယို တင်ပေးပါ...", type=["mp4", "mov"])
 
-uploaded_file = st.file_uploader("ဗီဒီယို တင်ပါ", type=["mp4", "mov", "avi"])
-
-if uploaded_file:
-    # ဗီဒီယိုကို ယာယီသိမ်းဆည်းခြင်း
-    tfile = tempfile.NamedTemporaryFile(delete=False)
-    tfile.write(uploaded_file.read())
-    
+if uploaded_file is not None:
     st.video(uploaded_file)
     
-    if st.button("Generate Recap"):
-        with st.spinner('AI က ဗီဒီယိုကို ကြည့်နေပါသည်...'):
+    if st.button("Recap ထုတ်မည်"):
+        with st.spinner('ခဏစောင့်ပေးပါ၊ AI က ကြည့်နေပါတယ်...'):
             try:
-                # ဗီဒီယိုထဲမှ ပုံရိပ်ကို OpenCV ဖြင့် ထုတ်ယူခြင်း
-                vidcap = cv2.VideoCapture(tfile.name)
-                # ဗီဒီယိုရဲ့ ပထမဆုံး စက္ကန့်ပိုင်းပုံကို ယူပါမည်
-                success, image = vidcap.read()
+                # ဗီဒီယိုတင်ပြီးမှသာ model ကို စခေါ်မှာပါ
+                model = load_model()
+                # ယာယီအားဖြင့် ဖိုင်နာမည်ကိုသုံးပြီး စစ်ခိုင်းပါမယ်
+                result = model(uploaded_file.name)
                 
-                if success:
-                    # BGR မှ RGB သို့ပြောင်းပြီး PIL format လုပ်ခြင်း
-                    img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                    pil_img = Image.fromarray(img_rgb)
-                    
-                    # AI Recap ထုတ်ပေးခြင်း
-                    result = caption_model(pil_img)
-                    recap_text = result[0]['generated_text']
-                    
-                    st.subheader("AI Recap Result:")
-                    st.success(recap_text)
-                    st.info("💡 ဒီစာသားလေးကို ကျွန်တော့်ဆီ ပို့ပေးပါ။ မြန်မာလို Recap Script အပီအပြင် ရေးပေးပါ့မယ်။")
-                else:
-                    st.error("ဗီဒီယိုပုံရိပ်ကို ဖတ်၍မရပါ။")
+                st.subheader("AI Recap (English):")
+                st.success(result[0]['generated_text'])
+                st.info("အပေါ်က အင်္ဂလိပ်စာကို Copy ကူးပြီး ကျွန်တော့်ဆီ ပို့ပေးပါ။ မြန်မာလို Recap Script ပြန်ရေးပေးပါ့မယ်။")
             except Exception as e:
-                st.error(f"Error ဖြစ်ပွားခဲ့သည်- {str(e)}")
-            finally:
-                vidcap.release()
-                os.unlink(tfile.name)
+                st.error(f"Error: {e}")
+else:
+    st.info("ဗီဒီယိုဖိုင်တစ်ခု အရင်ရွေးချယ်ပေးပါခင်ဗျာ။")
