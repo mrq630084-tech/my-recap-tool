@@ -11,7 +11,7 @@ st.title("🎬 Video Recap Tool")
 # AI Model ကို လုံးဝ အခြေခံကျကျ ခေါ်ယူခြင်း
 @st.cache_resource
 def load_model():
-    # task နာမည်ကို အမှားကင်းအောင် model ကို တိုက်ရိုက်ခေါ်ပါမည်
+    # task နာမည်ကို model တိုက်ရိုက်ခေါ်ခြင်းဖြင့် error ရှောင်ပါမည်
     return pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
 
 caption_model = load_model()
@@ -26,14 +26,15 @@ if uploaded_file:
     st.video(uploaded_file)
     
     if st.button("Generate Recap"):
-        with st.spinner('AI က ဗီဒီယိုကို လေ့လာနေပါသည်...'):
+        with st.spinner('AI က ဗီဒီယိုကို ကြည့်နေပါသည်...'):
             try:
                 # ဗီဒီယိုထဲမှ ပုံရိပ်ကို OpenCV ဖြင့် ထုတ်ယူခြင်း
                 vidcap = cv2.VideoCapture(tfile.name)
+                # ဗီဒီယိုရဲ့ ပထမဆုံး စက္ကန့်ပိုင်းပုံကို ယူပါမည်
                 success, image = vidcap.read()
                 
                 if success:
-                    # BGR မှ RGB သို့ပြောင်းပြီး AI နားလည်သော Format သို့ ပြောင်းခြင်း
+                    # BGR မှ RGB သို့ပြောင်းပြီး PIL format လုပ်ခြင်း
                     img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                     pil_img = Image.fromarray(img_rgb)
                     
@@ -43,11 +44,11 @@ if uploaded_file:
                     
                     st.subheader("AI Recap Result:")
                     st.success(recap_text)
-                    st.info("💡 ဒီစာသားကို Copy ကူးပြီး ကျွန်တော့်ဆီ ပို့ပေးပါ။ TikTok Recap Script မြန်မာလို အပီအပြင် ရေးပေးပါ့မယ်။")
+                    st.info("💡 ဒီစာသားလေးကို ကျွန်တော့်ဆီ ပို့ပေးပါ။ မြန်မာလို Recap Script အပီအပြင် ရေးပေးပါ့မယ်။")
                 else:
-                    st.error("ဗီဒီယိုကို ဖတ်၍မရပါ။")
+                    st.error("ဗီဒီယိုပုံရိပ်ကို ဖတ်၍မရပါ။")
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                st.error(f"Error ဖြစ်ပွားခဲ့သည်- {str(e)}")
             finally:
                 vidcap.release()
                 os.unlink(tfile.name)
