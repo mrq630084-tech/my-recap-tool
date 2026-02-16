@@ -1,31 +1,62 @@
 import streamlit as st
-from transformers import pipeline
+from transformers import BlipProcessor, BlipForConditionalGeneration, pipeline
+from PIL import Image
+import torch
 
-st.set_page_config(page_title="Video Recap Tool")
-st.title("🎬 AI Video Recap Generator")
+st.set_page_config(page_title="Video Recap Tool", layout="centered")
 
-# ဗီဒီယိုမတင်ခင် model ကို ကြိုမခေါ်အောင် လုပ်ထားပါတယ်
+st.title("🎬 Video Recap Tool")
+st.write("Upload an image → get caption → recap summary")
+
 @st.cache_resource
-def load_model():
-    return pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
+def load_models():
+    processor = BlipProcessor.from_pretrained(
+        "Salesforce/blip-image-captioning-base"
+    )
+    model = BlipForConditionalGeneration.from_pretrained(
+        "Salesforce/blip-image-captioning-base"
+    )
 
-uploaded_file = st.file_uploader("ဗီဒီယို တင်ပေးပါ...", type=["mp4", "mov"])
+    summarizer = pipeline(
+        "text2text-generation",
+        model="google/flan-t5-small"
+    )
 
-if uploaded_file is not None:
-    st.video(uploaded_file)
-    
-    if st.button("Recap ထုတ်မည်"):
-        with st.spinner('ခဏစောင့်ပေးပါ၊ AI က ကြည့်နေပါတယ်...'):
-            try:
-                # ဗီဒီယိုတင်ပြီးမှသာ model ကို စခေါ်မှာပါ
-                model = load_model()
-                # ယာယီအားဖြင့် ဖိုင်နာမည်ကိုသုံးပြီး စစ်ခိုင်းပါမယ်
-                result = model(uploaded_file.name)
-                
-                st.subheader("AI Recap (English):")
-                st.success(result[0]['generated_text'])
-                st.info("အပေါ်က အင်္ဂလိပ်စာကို Copy ကူးပြီး ကျွန်တော့်ဆီ ပို့ပေးပါ။ မြန်မာလို Recap Script ပြန်ရေးပေးပါ့မယ်။")
-            except Exception as e:
-                st.error(f"Error: {e}")
-else:
-    st.info("ဗီဒီယိုဖိုင်တစ်ခု အရင်ရွေးချယ်ပေးပါခင်ဗျာ။")
+    return processor, model, summarizer
+
+processor, model, summarizer = load_models()
+
+uploaded = st.file_uploader(
+    "Upload image frame from video",
+    type=["jpg", "jpeg", "png"]
+)
+
+if uploaded:
+
+    image = Image.open(uploaded).convert("RGB")
+    st.image(image, caption="Uploaded Frame")
+
+    with st.spinner("Generating caption..."):
+        inputs = processor(images=image, return_tensors="pt")
+        output = model.generate(**inputs)
+        caption = processor.decode(
+            output[0],
+            skip_special_tokens=True
+        )
+
+    st.subheader("📌 Caption")
+    st.write(caption)
+
+    with st.spinner("Creating recap summary..."):
+        prompt = f"Summarize this scene simply: {caption}"
+        result = summarizer(
+            prompt,
+            max_length=60,
+            do_sample=False
+        )
+        summary = result[0]["generated_text"]
+
+    st.subheader("🎥 Recap")
+    st.write(summary)
+
+    st.success("Done!")
