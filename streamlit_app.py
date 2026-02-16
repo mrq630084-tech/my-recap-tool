@@ -1,79 +1,86 @@
 import streamlit as st
-from transformers import pipeline
-from PIL import Image
+import requests
 import cv2
 import tempfile
 import os
 
-# ၁။ Dashboard UI အလှဆင်ခြင်း
-st.set_page_config(page_title="MasterMedia AI Dashboard", layout="wide")
+# Professional Dashboard UI Setup
+st.set_page_config(page_title="Master YourMedia Workflow", layout="wide")
 
+# CSS ဖြင့် UI ကို ပုံစံတူအောင် အလှဆင်ခြင်း
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .tool-card {
-        background-color: white;
-        padding: 25px;
-        border-radius: 15px;
-        border: 1px solid #eee;
-        text-align: center;
-        transition: 0.3s;
+    .main { background-color: #fcfcfc; }
+    .stButton>button {
+        width: 100%; border-radius: 12px; height: 100px;
+        background-color: white; border: 1px solid #e0e0e0;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.02);
     }
-    .tool-icon { font-size: 40px; }
-    .tool-title { font-weight: bold; font-size: 20px; color: #333; margin: 10px 0; }
+    .stButton>button:hover { border-color: #6c5ce7; color: #6c5ce7; }
+    .tool-header { text-align: center; margin-bottom: 30px; }
     </style>
     """, unsafe_allow_html=True)
 
-# စာမျက်နှာ ထိန်းချုပ်ရန် session_state သုံးခြင်း
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
+# --- NAVIGATION LOGIC ---
+def go_home(): st.session_state.page = 'home'
+
 # --- HOME PAGE (DASHBOARD) ---
 if st.session_state.page == 'home':
-    st.title("🚀 MasterMedia Workflow V4.5")
-    st.write("Professional AI Toolset for Content Creators")
+    st.markdown("<div class='tool-header'><h1>Master YourMedia Workflow.</h1><p>PROFESSIONAL AI TOOLSET V4.5</p></div>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3)
+    # Tool များကို Column လိုက် ခွဲပြခြင်း
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown('<div class="tool-card"><div class="tool-icon">🎬</div><div class="tool-title">Video Recap</div><p style="color:gray;">ဗီဒီယိုများကို အလိုအလျောက် အနှစ်ချုပ်ပေးမည်</p></div>', unsafe_allow_html=True)
-        if st.button("Open Recap Tool", use_container_width=True):
-            st.session_state.page = 'recap'
-            st.rerun()
+        if st.button("🎬 \n Video Recap \n (AI Analysis)"): st.session_state.page = 'recap'
+        if st.button("📝 \n Content Creator \n (TikTok/Reels)"): st.session_state.page = 'creator'
+        
+    with col2:
+        if st.button("🌍 \n Translate \n (Multi-Language)"): st.session_state.page = 'translate'
+        if st.button("🎙️ \n Transcribe \n (Voice to Text)"): st.info("Coming Soon!")
 
 # --- RECAP TOOL PAGE ---
 elif st.session_state.page == 'recap':
-    if st.button("⬅️ Back to Dashboard"):
-        st.session_state.page = 'home'
-        st.rerun()
-        
-    st.title("🎬 Professional Video Recapper")
+    st.button("⬅️ Back to Dashboard", on_click=go_home)
+    st.title("🎬 AI Video Recapper")
     
-    @st.cache_resource
-    def load_ai():
-        return pipeline("image-to-text", model="Salesforce/blip-image-captioning-base")
-
-    uploaded_file = st.file_uploader("ဗီဒီယို တင်ပေးပါ...", type=["mp4", "mov"])
-
-    if uploaded_file:
-        tfile = tempfile.NamedTemporaryFile(delete=False)
-        tfile.write(uploaded_file.read())
-        st.video(uploaded_file)
-        
+    video_file = st.file_uploader("ဗီဒီယို တင်ပေးပါ", type=["mp4", "mov"])
+    
+    if video_file:
+        st.video(video_file)
         if st.button("Generate Recap Script"):
-            with st.spinner('AI က ဗီဒီယိုကို လေ့လာနေပါသည်...'):
+            with st.spinner('AI က ဗီဒီယိုကို စစ်ဆေးနေသည်...'):
                 try:
-                    cap_model = load_ai()
-                    vidcap = cv2.VideoCapture(tfile.name)
-                    success, frame = vidcap.read()
+                    # Video Frame ထုတ်ယူခြင်း
+                    tfile = tempfile.NamedTemporaryFile(delete=False)
+                    tfile.write(video_file.read())
+                    cap = cv2.VideoCapture(tfile.name)
+                    success, frame = cap.read()
+                    
                     if success:
-                        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        pil_img = Image.fromarray(img_rgb)
-                        result = cap_model(pil_img)
-                        st.subheader("AI Result:")
-                        st.success(result[0]['generated_text'])
-                    vidcap.release()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-                finally:
+                        _, img_encoded = cv2.imencode('.jpg', frame)
+                        # Hugging Face API (Free tier) သုံး၍ Recap လုပ်ခြင်း
+                        API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
+                        response = requests.post(API_URL, data=img_encoded.tobytes())
+                        output = response.json()
+                        
+                        st.subheader("AI Recap Result:")
+                        st.success(output[0]['generated_text'])
+                        st.info("💡 အပေါ်ကစာကို Copy ကူးပြီး Content Creator ထဲမှာ Script ပြန်ရေးခိုင်းပါ။")
+                    cap.release()
                     os.unlink(tfile.name)
+                except:
+                    st.error("API ခေတ္တ မအားသေးပါ။ နောက်တစ်ခေါက် ပြန်နှိပ်ပေးပါ။")
+
+# --- CONTENT CREATOR PAGE ---
+elif st.session_state.page == 'creator':
+    st.button("⬅️ Back to Dashboard", on_click=go_home)
+    st.title("📝 AI Content Creator")
+    
+    recap_input = st.text_area("Recap စာသား ထည့်ပါ (သို့မဟုတ်) ခေါင်းစဉ် ရိုက်ပါ")
+    if st.button("Write TikTok Script"):
+        st.subheader("သင့်အတွက် Script:")
+        st.write(f"🎬 **TikTok Recap Script**\n\n[Hook]: အားလုံးပဲ မင်္ဂလာပါ! ဒီနေ့မှာတော့ {recap_input} အကြောင်း ပြောပြမယ်...\n\n[Body]: ဗီဒီယိုထဲမှာ တွေ့ရတဲ့အတိုင်းပဲ... (အသေးစိတ်ရှင်းပြချက်)\n\n[Call to Action]: နောက်ထပ် ဘာတွေ ကြည့်ချင်သေးလဲ? Comment မှာ ရေးခဲ့ဦးနော်!")
